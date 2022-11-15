@@ -1,0 +1,432 @@
+import { html, LitElement } from 'lit';
+import { customElement, property, query } from 'lit/decorators.js';
+import { classMap } from 'lit/directives/class-map.js';
+import '../../components/icon-button/icon-button';
+import { animateTo, stopAnimations } from '../../internal/animate';
+import { emit, waitForEvent } from '../../internal/event';
+import { HasSlotController } from '../../internal/slot';
+import { watch } from '../../internal/watch';
+import { getAnimation, setDefaultAnimation } from '../../utilities/animation-registry';
+import { LocalizeController } from '../../utilities/localize';
+import styles from './alert.styles';
+
+const toastStack = Object.assign(document.createElement('div'), { className: 'em9-toast-stack' });
+
+/**
+ * @since 1.0
+ * @status stable
+ *
+ * @dependency em9-icon-button
+ *
+ * @slot - The alert's content.
+ * @slot icon - An icon to show in the alert.
+ *
+ * @event em9-show - Emitted when the alert opens.
+ * @event em9-after-show - Emitted after the alert opens and all animations are complete.
+ * @event em9-hide - Emitted when the alert closes.
+ * @event em9-after-hide - Emitted after the alert closes and all animations are complete.
+ *
+ * @csspart base - The component's internal wrapper.
+ * @csspart icon - The container that wraps the alert icon.
+ * @csspart message - The alert message.
+ * @csspart close-button - The close button.
+ * @csspart close-button__base - The close button's `base` part.
+ *
+ * @cssproperty --box-shadow - The alert's box shadow.
+ *
+ * @animation alert.show - The animation to use when showing the alert.
+ * @animation alert.hide - The animation to use when hiding the alert.
+ */
+
+@customElement('em9-alert')
+export default class em9Alert extends LitElement {
+  static styles = styles;
+
+  private autoHideTimeout: number;
+  private readonly hasSlotController = new HasSlotController(this, 'icon', 'avatar', 'link1', 'link2', 'leftImg');
+  private readonly localize = new LocalizeController(this);
+
+  @query('[part="base"]') base: HTMLElement;
+
+  /** Indicates whether or not the alert is open. You can use this in lieu of the show/hide methods. */
+  @property({ type: Boolean, reflect: true }) open = false;
+
+  /** Makes the alert closable. */
+  @property({ type: Boolean, reflect: true }) closable = false;
+
+  @property({ type: Boolean, reflect: true }) iconCenter = false;
+
+  /** The alert's variant. */
+  @property({ reflect: true }) variant: 'primary' | 'success' | 'neutral' | 'warning' | 'danger' | 'default' =
+    'neutral';
+
+  /** The alert's Layout. */
+  @property({ reflect: true }) layout: 'vertical' | 'linear' = 'linear';
+
+  /**
+   * The length of time, in milliseconds, the alert will show before closing itself. If the user interacts with
+   * the alert before it closes (e.g. moves the mouse over it), the timer will restart. Defaults to `Infinity`.
+   */
+  @property({ type: Number }) duration = Infinity;
+  @property({ type: String }) leftImg? = '';
+
+  @property({ type: String }) badge? = '';
+  @property({ type: String }) alertTitle? = '';
+  @property({ type: String }) link1text? = '';
+  @property({ type: String }) link2text? = '';
+  @property({ type: String }) link1url? = '';
+  @property({ type: String }) link2url? = '';
+  @property({ type: String }) target? = '';
+
+  @property() type?: 'notification' | 'alert' | 'plain' = 'notification';
+
+  firstUpdated() {
+    this.base.hidden = !this.open;
+  }
+
+  /** Shows the alert. */
+  async show() {
+    if (this.open) {
+      return undefined;
+    }
+
+    this.open = true;
+    return waitForEvent(this, 'em9-after-show');
+  }
+
+  /** Hides the alert */
+  async hide() {
+    if (!this.open) {
+      return undefined;
+    }
+
+    this.open = false;
+    return waitForEvent(this, 'em9-after-hide');
+  }
+
+  /**
+   * Displays the alert as a toast notification. This will move the alert out of its position in the DOM and, when
+   * dismissed, it will be removed from the DOM completely. By storing a reference to the alert, you can reuse it by
+   * calling this method again. The returned promise will resolve after the alert is hidden.
+   */
+  async toast() {
+    return new Promise<void>(resolve => {
+      if (toastStack.parentElement === null) {
+        document.body.append(toastStack);
+      }
+
+      toastStack.appendChild(this);
+
+      // Wait for the toast stack to render
+      requestAnimationFrame(() => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- force a reflow for the initial transition
+        this.clientWidth;
+        this.show();
+      });
+
+      this.addEventListener(
+        'em9-after-hide',
+        () => {
+          toastStack.removeChild(this);
+          resolve();
+
+          // Remove the toast stack from the DOM when there are no more alerts
+          if (toastStack.querySelector('em9-alert') === null) {
+            toastStack.remove();
+          }
+        },
+        { once: true }
+      );
+    });
+  }
+
+  restartAutoHide() {
+    clearTimeout(this.autoHideTimeout);
+    if (this.open && this.duration < Infinity) {
+      this.autoHideTimeout = window.setTimeout(() => this.hide(), this.duration);
+    }
+  }
+
+  handleCloseClick() {
+    this.hide();
+  }
+
+  handleMouseMove() {
+    this.restartAutoHide();
+  }
+
+  @watch('open', { waitUntilFirstUpdate: true })
+  async handleOpenChange() {
+    if (this.open) {
+      // Show
+      emit(this, 'em9-show');
+
+      if (this.duration < Infinity) {
+        this.restartAutoHide();
+      }
+
+      await stopAnimations(this.base);
+      this.base.hidden = false;
+      const { keyframes, options } = getAnimation(this, 'alert.show', { dir: this.localize.dir() });
+      await animateTo(this.base, keyframes, options);
+
+      emit(this, 'em9-after-show');
+    } else {
+      // Hide
+      emit(this, 'em9-hide');
+
+      clearTimeout(this.autoHideTimeout);
+
+      await stopAnimations(this.base);
+      const { keyframes, options } = getAnimation(this, 'alert.hide', { dir: this.localize.dir() });
+      await animateTo(this.base, keyframes, options);
+      this.base.hidden = true;
+
+      emit(this, 'em9-after-hide');
+    }
+  }
+
+  @watch('duration')
+  handleDurationChange() {
+    this.restartAutoHide();
+  }
+
+  render() {
+    const hasIconSlot = this.hasSlotController.test('icon');
+    const hasAvatarSlot = this.hasSlotController.test('avatar');
+    const hasLink1 = this.hasSlotController.test('link1');
+    const hasLink2 = this.hasSlotController.test('link2');
+    let htmlCode = html``;
+    switch (this.type) {
+      case 'notification':
+        htmlCode = html`
+          <div
+            part="base"
+            class=${classMap({
+              alert: true,
+              'alert--open': this.open,
+              'alert--closable': this.closable,
+              'alert--vertical': this.layout === 'vertical',
+              'alert--has-icon': hasIconSlot,
+              'alert--has-avatar': hasAvatarSlot,
+              'alert--has-link1': hasLink1,
+              'alert--has-link2': hasLink2,
+              'content-middle': this.iconCenter,
+              'alert--has-left-img': this.leftImg !== '',
+              'alert--primary': this.variant === 'primary',
+              'alert--success': this.variant === 'success',
+              'alert--neutral': this.variant === 'neutral',
+              'alert--warning': this.variant === 'warning',
+              'alert--danger': this.variant === 'danger',
+              'alert--default': this.variant === 'default',
+              'alert--type-notification': true
+            })}
+            role="alert"
+            aria-live="assertive"
+            aria-atomic="true"
+            aria-hidden=${this.open ? 'false' : 'true'}
+            @mousemove=${this.handleMouseMove}
+          >
+            <span part="icon" class="alert__icon">
+              <slot name="icon"></slot>
+            </span>
+            ${this.leftImg !== ''
+              ? html`
+                  <span
+                    part="leftImg"
+                    class="alert__left_mg"
+                    style="background:var(--em9-color-gray-50) url(${this.leftImg
+                      ? this.leftImg
+                      : ''}) no-repeat center center;"
+                  >
+                    <slot name="leftImg"></slot>
+                  </span>
+                `
+              : ''}
+            <span part="avatar" class="alert__avatar">
+              <slot name="avatar"></slot>
+            </span>
+            <div part="message" class="alert__message">
+              <slot></slot>
+              ${this.hasSlotController.test('link1')
+                ? html`
+                    <div class="alert__links">
+                      <span part="link1" class="alert__link">
+                        <slot name="link1"></slot>
+                      </span>
+                      <span part="link2" class="alert__link">
+                        <slot name="link2"></slot>
+                      </span>
+                    </div>
+                  `
+                : ''}
+            </div>
+
+            ${this.closable
+              ? html`
+                  <em9-icon-button
+                    size="small"
+                    part="close-button"
+                    exportparts="base:close-button__base"
+                    class="alert__close-button"
+                    name="x"
+                    library="system"
+                    @click=${this.handleCloseClick}
+                  ></em9-icon-button>
+                `
+              : ''}
+          </div>
+        `;
+        break;
+      case 'alert':
+        htmlCode = html`
+          <div
+            part="base"
+            class=${classMap({
+              alert: true,
+              'linear--alert': true,
+              'linear--alert--has-icon': hasIconSlot,
+              'alert--closable': this.closable,
+              'linear--alert--has-link1': hasLink1,
+              'linear--alert--has-link2': hasLink2,
+              'linear--alert--primary': this.variant === 'primary',
+              'linear--alert--success': this.variant === 'success',
+              'linear--alert--neutral': this.variant === 'neutral',
+              'linear--alert--warning': this.variant === 'warning',
+              'linear--alert--danger': this.variant === 'danger',
+              'linear--alert--default': this.variant === 'default',
+              'linear--alert--has--badge': this.badge !== ''
+            })}
+            role="alert"
+            aria-live="assertive"
+            aria-atomic="true"
+          >
+            <span part="icon" class="alert__icon">
+              <slot name="icon"></slot>
+            </span>
+            <div part="message" class="linear--alert--msg">
+              <slot></slot>
+            </div>
+            ${this.closable
+              ? html`
+                  <em9-icon-button
+                    size="small"
+                    part="close-button"
+                    exportparts="base:close-button__base"
+                    class="alert__close-button"
+                    name="x"
+                    library="system"
+                    @click=${this.handleCloseClick}
+                  ></em9-icon-button>
+                `
+              : ''}
+          </div>
+        `;
+        break;
+      case 'plain':
+        htmlCode = html`
+          <div
+            part="base"
+            class=${classMap({
+              alert: true,
+              'alert--open': this.open,
+              'alert--closable': this.closable,
+              'alert--vertical': this.layout === 'vertical',
+              'alert--has-icon': hasIconSlot,
+              'alert--has-avatar': hasAvatarSlot,
+              'alert--has-link1': hasLink1,
+              'alert--has-link2': hasLink2,
+              'content-middle': this.iconCenter,
+              'alert--has-left-img': this.leftImg !== '',
+              'alert--primary': this.variant === 'primary',
+              'alert--success': this.variant === 'success',
+              'alert--neutral': this.variant === 'neutral',
+              'alert--warning': this.variant === 'warning',
+              'alert--danger': this.variant === 'danger',
+              'alert--default': this.variant === 'default',
+              'alert--type-plain': true
+            })}
+            role="alert"
+            aria-live="assertive"
+            aria-atomic="true"
+            aria-hidden=${this.open ? 'false' : 'true'}
+            @mousemove=${this.handleMouseMove}
+          >
+            <span part="icon" class="alert__icon">
+              <slot name="icon"></slot>
+            </span>
+            ${this.leftImg !== ''
+              ? html`
+                  <span
+                    part="leftImg"
+                    class="alert__left_mg"
+                    style="background:var(--em9-color-gray-50) url(${this.leftImg
+                      ? this.leftImg
+                      : ''}) no-repeat center center;"
+                  >
+                    <slot name="leftImg"></slot>
+                  </span>
+                `
+              : ''}
+            <span part="avatar" class="alert__avatar">
+              <slot name="avatar"></slot>
+            </span>
+            <div part="message" class="alert__message">
+              <strong part="plain-alert-title" class="alert-title">
+                <slot name="plain-alert-title"></slot>
+              </strong>
+              <br />
+              <slot></slot>
+              <div class="alert__links">
+                <span part="link1" class="alert__link">
+                  <slot name="link1"></slot>
+                </span>
+                <span part="link2" class="alert__link">
+                  <slot name="link2"></slot>
+                </span>
+              </div>
+            </div>
+
+            ${this.closable
+              ? html`
+                  <em9-icon-button
+                    size="small"
+                    part="close-button"
+                    exportparts="base:close-button__base"
+                    class="alert__close-button"
+                    name="x"
+                    library="system"
+                    @click=${this.handleCloseClick}
+                  ></em9-icon-button>
+                `
+              : ''}
+          </div>
+        `;
+
+        break;
+    }
+    return htmlCode;
+  }
+}
+
+setDefaultAnimation('alert.show', {
+  keyframes: [
+    { opacity: 0, transform: 'scale(0.8)' },
+    { opacity: 1, transform: 'scale(1)' }
+  ],
+  options: { duration: 250, easing: 'ease' }
+});
+
+setDefaultAnimation('alert.hide', {
+  keyframes: [
+    { opacity: 1, transform: 'scale(1)' },
+    { opacity: 0, transform: 'scale(0.8)' }
+  ],
+  options: { duration: 250, easing: 'ease' }
+});
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'em9-alert': em9Alert;
+  }
+}
