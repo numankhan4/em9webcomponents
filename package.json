@@ -1,7 +1,7 @@
 {
   "name": "em9webcomponents",
   "description": "A forward-thinking web components library that works with all frameworks.",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": "Numan Ul Haq",
   "license": "MIT",
   "main": "dist/em9Library.js",
@@ -54,7 +54,8 @@
     "libphonenumber-js": "^1.10.14",
     "lit": "^2.2.5",
     "perfect-scrollbar": "^1.5.5",
-    "qr-creator": "^1.0.0"
+    "qr-creator": "^1.0.0",
+    "web-elements-icons": "^0.1.3"
   },
   "devDependencies": {
     "@custom-elements-manifest/analyzer": "^0.6.1",

@@ -3,7 +3,7 @@ import { customElement, property } from 'lit/decorators.js';
 import styles from './empty-states.styles';
 import { HasSlotController } from '../../internal/slot';
 import { classMap } from 'lit/directives/class-map.js';
-import em9Element from 'src/internal/em9Element';
+import em9Element from 'src/internal/em9-element';
 
 /**
  * @since 1.0

@@ -3,7 +3,7 @@ import { customElement, property, query } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { animateTo, stopAnimations } from '../../internal/animate';
 import { waitForEvent } from '../../internal/event';
-import em9IncElement from "../../internal/em9Inc-element";
+import em9IncElement from '../../internal/em9-element';
 import { scrollIntoView } from '../../internal/scroll';
 import { getTabbableBoundary } from '../../internal/tabbable';
 import { watch } from '../../internal/watch';
@@ -409,9 +409,9 @@ export default class em9Dropdown extends em9IncElement {
         auto-size="vertical"
         auto-size-padding="10"
         class=${classMap({
-      dropdown: true,
-      'dropdown--open': this.open
-    })}
+          dropdown: true,
+          'dropdown--open': this.open
+        })}
       >
         <span
           slot="anchor"

@@ -15,14 +15,14 @@ import path from 'path';
 const { outdir } = commandLineArgs({ name: 'outdir', type: String });
 const iconDir = path.join(outdir, '/assets/iconsax');
 
-const iconPackageData = JSON.parse(readFileSync('./node_modules/@iconslib/em9icons/package.json', 'utf8'));
+const iconPackageData = JSON.parse(readFileSync('./node_modules/web-elements-icons/package.json', 'utf8'));
 let numIcons = 0;
 
 (async () => {
   try {
     const version = iconPackageData.version;
-    const srcPath = `./.cache/icons`;
-    const url = `https://bitbucket.em9inc.com/rest/api/latest/projects/~NHAQ/repos/em9-icons-library/archive?at=refs%2Fheads%2Ffhaider&format=zip`;
+    const srcPath = `./.cache/icons/web-elements-icons`;
+    const url = `https://github.com/numankhan4/web-elements-icons/archive/refs/heads/main.zip`;
 
     try {
       await stat(`${srcPath}/LICENSE.md`);

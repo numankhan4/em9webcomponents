@@ -2,7 +2,7 @@ import { arrow, autoUpdate, computePosition, flip, offset, shift, size } from '@
 import { html } from 'lit';
 import { customElement, property, query } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
-import em9IncElement from "../../internal/em9Inc-element";
+import em9IncElement from '../../internal/em9-element';
 import styles from './popup.styles';
 import type { CSSResultGroup } from 'lit';
 
